@@ -1,0 +1,25 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Audio Device Selection</title>
+
+    <style>
+      textarea{resize:none}
+    </style>
+  </head>
+
+  <body>
+    <h3>Audio Device Sample</h3>
+
+    <select id="audioInputDevices"></select> (please grant permission to see device names)
+
+    <p><button id="connectButton">Connect</button>
+    <button id="disconnectButton">Disconnect</button>
+
+    <p><button id="clearStatusButton">Clear</button></p>
+    <p><textarea rows="30" cols="100" id="statusArea" readonly></textarea></p>
+
+    <audio id="audioElement" autoplay></audio>
+
+    <script type="text/javascript" src="bundle.js"></script>
+</html>
