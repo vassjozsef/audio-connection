@@ -6,6 +6,8 @@ const statusArea = document.getElementById('statusArea');
 const clearStatusButton = document.getElementById('clearStatusButton');
 const audioInputDevies = document.getElementById('audioInputDevices');
 const audioElement = document.getElementById('audioElement');
+const sentStatsLabel = document.getElementById('sentStatsLabel');
+const receivedStatsLabel = document.getElementById('receivedStatsLabel');
 
 connectButton.onclick = connect;
 disconnectButton.onclick = disconnect;
@@ -19,6 +21,34 @@ var pc1 = null;
 var pc2 = null;
 
 var stream1 = null;
+
+var stats = setInterval(() => {
+  const pcOut = pc1;
+  if (pcOut!= null) {
+    pcOut.getStats().then(res => {
+    res.forEach(report => {
+      if (report.type === 'outbound-rtp') {
+        sentStatsLabel.innerHTML = `Packets: ${report.packetsSent}, bytes: ${report.bytesSent}`;
+      }
+    });
+    }).catch(error => {
+      status(`Failed to get stats for PC1: ${error.toString()}\n`)
+    });
+  }
+  const pcIn = pc2;
+  if (pcIn!= null) {
+    pcIn.getStats().then(res => {
+    res.forEach(report => {
+      if (report.type === 'inbound-rtp') {
+        receivedStatsLabel.innerHTML = `Packets: ${report.packetsReceived}, bytes: ${report.bytesReceived}`;
+      }
+    });
+    }).catch(error => {
+      status(`Failed to get stats for PC1: ${error.toString()}\n`)
+    });
+  }
+
+}, 1000);
 
 const offerOptions = {
   offerToReceiveAudio: 1,
