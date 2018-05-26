@@ -17,8 +17,11 @@ clearStatusButton.onclick = () => {
   statusArea.innerHTML = ''
 }
 
+disconnectButton.disabled = true;
+
 var pc1 = null;
 var pc2 = null;
+var sender1 = null;
 
 var stream1 = null;
 
@@ -28,7 +31,6 @@ var stats = setInterval(() => {
     pcOut.getStats().then(res => {
     res.forEach(report => {
       if (report.type === 'outbound-rtp') {
-        status(`Packets sent: ${report.packetsSent}\n`);
         sentStatsLabel.innerHTML = `Packets: ${report.packetsSent}, bytes: ${report.bytesSent}`;
       }
     });
@@ -141,12 +143,16 @@ function connect() {
     };
     pc1.oniceconnectionstatechange = (e) => {
       status(`PC1 ice connection state: ${e.currentTarget.iceConnectionState}\n`);
+      if (e.currentTarget.iceConnectionState === 'connected') {
+        connectButton.disabled = true;
+        disconnectButton.disabled = false;
+      }
     };
     pc1.onnegotiationneeded = (e) => {
       negotiate();
     };
     localStream.getTracks().forEach(track => {
-      pc1.addTrack(track, localStream);
+      sender1 = pc1.addTrack(track, localStream);
     });
 
     pc2 = new RTCPeerConnection();
@@ -181,12 +187,16 @@ function disconnect() {
     pc2.close();
     pc2 = null;
   }
+  connectButton.disabled = false;
+  disconnectButton.disabled = true;
 }
 
 function changeDevice() {
   if (pc1 == null) {
     return;
   }
+  pc1.removeTrack(sender1);
+  sender1 = null;
   if (stream1 != null) {
     stream1.getTracks().forEach(track => track.stop());
   }
@@ -200,7 +210,7 @@ function changeDevice() {
     stream1 = localStream;
 
     localStream.getTracks().forEach(track => {
-      pc1.addTrack(track, localStream);
+      sender1 = pc1.addTrack(track, localStream);
     });
   }).catch(error => {
     status(`getUserMedia error: ${error.toString()}\n`);
