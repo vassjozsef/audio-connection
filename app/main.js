@@ -11,7 +11,7 @@ const receivedStatsLabel = document.getElementById('receivedStatsLabel');
 
 connectButton.onclick = connect;
 disconnectButton.onclick = disconnect;
-audioInputDevies.onchange = changeDevice();
+audioInputDevies.onchange = changeDevice;
 
 clearStatusButton.onclick = () => {
   statusArea.innerHTML = ''
@@ -28,6 +28,7 @@ var stats = setInterval(() => {
     pcOut.getStats().then(res => {
     res.forEach(report => {
       if (report.type === 'outbound-rtp') {
+        status(`Packets sent: ${report.packetsSent}\n`);
         sentStatsLabel.innerHTML = `Packets: ${report.packetsSent}, bytes: ${report.bytesSent}`;
       }
     });
@@ -89,11 +90,41 @@ function enumerateDevices() {
   });
 }
 
-function connect() {
-  const selected = audioInputDevies.value;
-  status(`Using device: ${selected}\n`);
+function negotiate() {
+  status('Negotiating\n');
+  pc1.createOffer(offerOptions).then(offer => {
+    status(`Create offer: ${offer.sdp}\n`);
+    pc1.setLocalDescription(offer).then(() => {
+      pc2.setRemoteDescription(offer).then(() => {
+        pc2.createAnswer().then(answer => {
+          status(`Create answer: ${answer.sdp}\n`);
+          pc2.setLocalDescription(answer).then(() => {
+            pc1.setRemoteDescription(answer).catch(error => {
+              status(`Failed to set remote description to PC1: ${error.toString()}\n`);
+            });
+          }).catch(error => {
+            status(`Failed to set local description to PC2: ${error.toString()}\n`);
+          });
+        }).catch(error => {
+          status(`Failed to create answer: ${error.toString()}\n`);
+        });
+      }).catch(error => {
+        status(`Failed to set remote description for PC2: ${error.toString()}\n`);
+      });
+    }).catch(error => {
+      status(`Failed to set local description for PC1: ${error.toString()}\n`);
+    });
+  }).catch(error => {
+    status(`Failed to create offer: ${error.toString()}\n`);
+  });
+} 
 
-  const constraints = {audio: {deviceId: selected}};
+function connect() {
+  const id = audioInputDevies.options[audioInputDevies.selectedIndex].value;
+  const label = audioInputDevies.options[audioInputDevies.selectedIndex].text;
+  status(`Using device: ${label}\n`);
+
+  const constraints = {audio: {deviceId: id}};
   navigator.mediaDevices.getUserMedia(constraints).then(localStream => {
     stream1 = localStream;
 
@@ -110,6 +141,9 @@ function connect() {
     };
     pc1.oniceconnectionstatechange = (e) => {
       status(`PC1 ice connection state: ${e.currentTarget.iceConnectionState}\n`);
+    };
+    pc1.onnegotiationneeded = (e) => {
+      negotiate();
     };
     localStream.getTracks().forEach(track => {
       pc1.addTrack(track, localStream);
@@ -130,35 +164,9 @@ function connect() {
       status(`PC2 ice connection state: ${e.currentTarget.iceConnectionState}\n`);
     };
     pc2.ontrack = (t) => {
-      status('PC2 track received');
+      status('PC2 track received\n');
       audioElement.srcObject = t.streams[0];
     }
-
-    pc1.createOffer(offerOptions).then(offer => {
-      status(`Create offer: ${offer.sdp}\n`);
-      pc1.setLocalDescription(offer).then(() => {
-        pc2.setRemoteDescription(offer).then(() => {
-          pc2.createAnswer().then(answer => {
-            status(`Create answer: ${answer.sdp}\n`);
-            pc2.setLocalDescription(answer).then(() => {
-              pc1.setRemoteDescription(answer).catch(error => {
-                status(`Failed to set remote description to PC1: ${error.toString()}\n`);
-              });
-            }).catch(error => {
-              status(`Failed to set local description to PC2: ${error.toString()}\n`);
-            });
-          }).catch(error => {
-            status(`Failed to create answer: ${error.toString()}\n`);
-          });
-        }).catch(error => {
-          status(`Failed to set remote description for PC2: ${error.toString()}\n`);
-        });
-      }).catch(error => {
-        status(`Failed to set local description for PC1: ${error.toString()}\n`);
-      });
-    }).catch(error => {
-      status(`Failed to create offer: ${error.toString()}\n`);
-    });
   }).catch(error => {
     status(`getUserMedia error: ${error.toString()}\n`);
   });
@@ -176,4 +184,25 @@ function disconnect() {
 }
 
 function changeDevice() {
+  if (pc1 == null) {
+    return;
+  }
+  if (stream1 != null) {
+    stream1.getTracks().forEach(track => track.stop());
+  }
+  const id = audioInputDevies.options[audioInputDevies.selectedIndex].value;
+  const label = audioInputDevies.options[audioInputDevies.selectedIndex].text;
+  status(`Changing device: ${label}\n`);
+  const constraints = {audio: {deviceId: id}};
+
+  navigator.mediaDevices.getUserMedia(constraints).then(localStream => {
+    status('getUserMedia success\n');
+    stream1 = localStream;
+
+    localStream.getTracks().forEach(track => {
+      pc1.addTrack(track, localStream);
+    });
+  }).catch(error => {
+    status(`getUserMedia error: ${error.toString()}\n`);
+  });
 }
